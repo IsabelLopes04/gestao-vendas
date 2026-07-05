@@ -1,0 +1,1 @@
+//funções que geram o HTML dinâmico

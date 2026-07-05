@@ -1,0 +1,1 @@
+//o estado da aplicação
