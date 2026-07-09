@@ -33,3 +33,6 @@ app.use('/api/vendas', vendasRoutes);
 
 const relatoriosRoutes = require('./routes/relatorios.routes');
 app.use('/api/relatorios', relatoriosRoutes);   
+
+const metasRoutes = require('./routes/metas.routes');
+app.use('/api/metas', metasRoutes);

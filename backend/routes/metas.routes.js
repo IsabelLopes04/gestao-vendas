@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const relatoriosController = require('../controllers/relatorios.controller');
+const metasController = require('../controllers/metas.controller');
 
-router.get('/pdf', relatoriosController.gerarRelatorioPDF);
+router.get('/', metasController.listarMetas);
+router.post('/', metasController.criarOuAtualizarMeta);
+router.delete('/:id', metasController.deletarMeta);
 
 module.exports = router;
