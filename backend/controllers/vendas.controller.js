@@ -57,3 +57,33 @@ exports.deletarVenda = async (req, res) => {
     res.status(500).json({ erro: 'Erro ao deletar venda' });
   }
 };
+
+// GET /api/vendas/ranking?mes=2026-07
+exports.rankingPromotores = async (req, res) => {
+  try {
+    const { mes } = req.query; // formato: '2026-07'
+
+    let sql = `
+      SELECT 
+        promotor,
+        COUNT(*) AS total_vendas,
+        SUM(clinico + raspagem + inicio) AS faturamento_total
+      FROM vendas
+      WHERE 1=1
+    `;
+    const params = [];
+
+    if (mes) {
+      sql += ' AND DATE_FORMAT(data_venda, "%Y-%m") = ?';
+      params.push(mes);
+    }
+
+    sql += ' GROUP BY promotor ORDER BY faturamento_total DESC';
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erro: 'Erro ao buscar ranking' });
+  }
+};

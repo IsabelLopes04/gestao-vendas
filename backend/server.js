@@ -30,3 +30,6 @@ app.get('/teste-db', async (req, res) => {
 
 const vendasRoutes = require('./routes/vendas.routes');
 app.use('/api/vendas', vendasRoutes);
+
+const relatoriosRoutes = require('./routes/relatorios.routes');
+app.use('/api/relatorios', relatoriosRoutes);   
