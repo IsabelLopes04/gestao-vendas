@@ -1,126 +1,225 @@
-//O componente principal do seu app
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import {
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 
+import { AppLayout } from './components/AppLayout';
+import { Toast } from './components/ui';
 
-function App() { // Um componente - Uma função que retorna o que deve aparecer na tela
-  const [count, setCount] = useState(0) 
-  //seState cria uma "variável especial" que, quando muda, faz o React redesenhar a tela automaticamente.
-  // count → o valor atual (começa em 0)
-  // setCount → a função que você chama pra mudar esse valor
+import { DashboardPage } from './pages/DashboardPage';
+import { GoalsPage } from './pages/GoalsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { SalesPage } from './pages/SalesPage';
+import { PromotersPage } from './pages/PromotersPage';
+
+import { api } from './services/api';
+
+import type {
+  Meta,
+  PageKey,
+  RankingItem,
+  Venda,
+} from './types';
+
+import { getCurrentMonth } from './utils/formatters';
+
+export default function App() {
+  const [page, setPage] = useState<PageKey>('dashboard');
+
+  const [month, setMonth] = useState(getCurrentMonth);
+
+  const [sales, setSales] = useState<Venda[]>([]);
+  const [metas, setMetas] = useState<Meta[]>([]);
+  const [ranking, setRanking] = useState<RankingItem[]>([]);
+
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [newSaleSignal, setNewSaleSignal] = useState(0);
+
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  }>({
+    message: '',
+    type: 'success',
+  });
+
+  // Fecha as notificações automaticamente.
+  useEffect(() => {
+    if (!toast.message) return;
+
+    const timeout = window.setTimeout(
+      () => setToast({
+        message: '',
+        type: 'success',
+      }),
+      4000
+    );
+
+    return () => window.clearTimeout(timeout);
+  }, [toast.message]);
+
+  // Exibe notificações.
+  const notify = useCallback(
+    (
+      message: string,
+      type: 'success' | 'error' = 'success'
+    ) => {
+      setToast({ message, type });
+    },
+    []
+  );
+
+  // Atualiza os dados do sistema.
+  const refreshData = useCallback(() => {
+    setRefreshKey((current) => current + 1);
+  }, []);
+
+  // Carrega vendas, metas e ranking.
+  useEffect(() => {
+    let active = true;
+
+    async function loadData() {
+      setLoading(true);
+      setLoadError('');
+
+      try {
+        const [
+          salesResult,
+          goalsResult,
+          rankingResult,
+        ] = await Promise.all([
+          api.listarVendas(),
+          api.listarMetas(month),
+          api.rankingPromotores(month),
+        ]);
+
+        if (!active) return;
+
+        setSales(salesResult);
+        setMetas(goalsResult);
+        setRanking(rankingResult);
+      } catch (error) {
+        if (!active) return;
+
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar os dados.'
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadData();
+
+    return () => {
+      active = false;
+    };
+  }, [month, refreshKey]);
+
+  // Abre a tela de vendas.
+  function handleNewSale() {
+    setPage('sales');
+    setNewSaleSignal((current) => current + 1);
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>GESTÃO DE VENDAS</h1>
-          <p>
-            O APP <code>revolution.html</code>  <code>html</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1 )}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <AppLayout
+      page={page}
+      onNavigate={setPage}
+      onNewSale={handleNewSale}
+    >
 
-      <div className="ticks"></div>
+      {loadError && (
+        <div className="connection-alert" role="alert">
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+          <div>
+            <IconAlert />
+            <span>{loadError}</span>
+          </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+          <button
+            type="button"
+            onClick={refreshData}
+          >
+            Tentar novamente
+          </button>
+
+        </div>
+      )}
+
+      {page === 'dashboard' && (
+        <DashboardPage
+          sales={sales}
+          metas={metas}
+          ranking={ranking}
+          month={month}
+          onMonthChange={setMonth}
+          loading={loading}
+        />
+      )}
+
+      {page === 'sales' && (
+        <SalesPage
+          sales={sales}
+          openSignal={newSaleSignal}
+          onChanged={refreshData}
+          onNotify={notify}
+        />
+      )}
+
+      {page === 'goals' && (
+        <GoalsPage
+          metas={metas}
+          sales={sales}
+          month={month}
+          onMonthChange={setMonth}
+          onChanged={refreshData}
+          onNotify={notify}
+        />
+      )}
+
+      {page === 'reports' && (
+        <ReportsPage
+          sales={sales}
+          onNotify={notify}
+        />
+      )}
+
+      {page === 'promoters' && (
+        <PromotersPage
+          onChanged={refreshData}
+          onNotify={notify}
+        />
+      )}
+
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        onClose={() =>
+          setToast({
+            message: '',
+            type: 'success',
+          })
+        }
+      />
+
+    </AppLayout>
+  );
 }
 
-export default App
+function IconAlert() {
+  return (
+    <span
+      className="connection-alert-icon"
+      aria-hidden="true"
+    >
+      !
+    </span>
+  );
+}

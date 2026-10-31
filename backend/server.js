@@ -36,3 +36,6 @@ app.use('/api/relatorios', relatoriosRoutes);
 
 const metasRoutes = require('./routes/metas.routes');
 app.use('/api/metas', metasRoutes);
+
+const promotoresRoutes = require('./routes/promotores.routes');
+app.use('/api/promotores', promotoresRoutes);
