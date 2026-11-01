@@ -1,146 +1,180 @@
 # Gestão de Vendas
 
-Sistema para registro de vendas (procedimentos), acompanhamento de metas
-por promotor e geração de relatórios — desenvolvido como projeto de
-estudo, aplicando na prática conceitos de backend e frontend.
+Sistema web para gerenciamento de vendas, metas e desempenho de promotores, com dashboard, rankings e geração de relatórios em PDF.
 
-> Documentação de aprendizado: veja [`APRENDIZADO.md`](./APRENDIZADO.md)
-> para o passo a passo dos conceitos estudados durante a construção deste
-> projeto.
+## Sobre o projeto
+
+O Gestão de Vendas foi desenvolvido para centralizar o controle de vendas de uma clínica, facilitando o acompanhamento dos resultados, o gerenciamento de promotores e a análise do desempenho mensal.
+
+A aplicação possui frontend e backend integrados a um banco de dados MySQL.
 
 ## Funcionalidades
 
-- Cadastro, edição, listagem e remoção de vendas
-- Filtros por promotor, código/paciente e faixa de valor
-- Ranking de promotores por faturamento, com filtro por mês
-- Cadastro de metas mensais (gerais da clínica e individuais por promotor)
-- Exportação de relatório em PDF (ranking + vendas)
+### Dashboard
+- Indicadores de vendas e faturamento.
+- Cálculo de ticket médio.
+- Gráfico de evolução do faturamento.
+- Acompanhamento das metas mensais.
+- Filtro por mês de referência.
 
-## Tecnologias
+### Gestão de vendas
+- Cadastro, edição, listagem e exclusão de vendas.
+- Busca por código ou paciente.
+- Filtros por promotor e faixa de valor.
 
-**Backend**
-- Node.js + Express
-- MySQL (`mysql2`)
-- PDFKit (geração de relatórios em PDF)
+### Gestão de promotores
+- Cadastro e edição de promotores.
+- Ativação e desativação de cadastros.
+- Exclusão de promotores sem perder o histórico de vendas e metas.
+
+### Gestão de metas
+- Cadastro de metas mensais.
+- Metas gerais da clínica.
+- Metas individuais por promotor.
+- Atualização das metas existentes.
+
+### Rankings de desempenho
+
+A aplicação possui dois rankings independentes:
+
+- **Ranking de início:** contabiliza a quantidade de vendas que possuem valor de início maior que zero.
+- **Ranking de faturamento:** soma os valores dos procedimentos clínico, raspagem e início, considerando todas as vendas.
+
+Os dois rankings podem ser consultados por mês de referência.
+
+### Relatórios
+- Geração de relatórios em PDF.
+- Exibição dos dois rankings de desempenho.
+- Listagem das vendas registradas.
+
+## Tecnologias utilizadas
 
 **Frontend**
-- React + TypeScript
+- React
+- TypeScript
 - Vite
 - Tailwind CSS
 
-**Ferramentas de apoio**
-- Bruno (testes de API)
+**Backend**
+- Node.js
+- Express
+- MySQL2
+- PDFKit
+
+**Banco de dados**
+- MySQL
 
 ## Estrutura do projeto
 
-```
+```text
 gestao-vendas/
 ├── backend/
-│   ├── controllers/       # lógica de cada recurso (vendas, metas, relatórios)
-│   ├── routes/             # mapeamento de rotas
-│   ├── db.js                # conexão com o MySQL
-│   ├── server.js             # ponto de entrada da API
-│   └── .env                   # variáveis de ambiente (não versionado)
+│   ├── controllers/
+│   ├── routes/
+│   ├── db.js
+│   └── server.js
 │
 ├── frontend-react/
 │   └── src/
-│       ├── components/     # componentes reutilizáveis da interface
-│       ├── services/         # comunicação com a API (fetch)
-│       ├── types/              # tipos TypeScript (Venda, Meta)
-│       ├── App.tsx              # componente principal
-│       └── main.tsx              # ponto de entrada
+│       ├── components/
+│       ├── pages/
+│       ├── services/
+│       ├── types/
+│       ├── utils/
+│       └── App.tsx
 │
 ├── README.md
-└── APRENDIZADO.md         # anotações de estudo
+└── APRENDIZADO.md
 ```
 
-## Como rodar o projeto
+## Como executar o projeto
 
 ### Pré-requisitos
-- Node.js instalado
-- MySQL instalado e rodando
 
-### Banco de dados
+- Node.js
+- MySQL
+- npm
 
-Crie o banco e as tabelas executando o script SQL abaixo no MySQL
-Workbench (ou cliente de sua preferência):
+### 1. Clonar o repositório
+
+```bash
+git clone https://github.com/IsabelLopes04/gestao-vendas.git
+cd gestao-vendas
+```
+
+### 2. Configurar o banco de dados
+
+Crie o banco de dados no MySQL:
 
 ```sql
 CREATE DATABASE gestao_vendas;
-USE gestao_vendas;
-
-CREATE TABLE vendas (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  codigo VARCHAR(50) NOT NULL,
-  paciente VARCHAR(150) NOT NULL,
-  promotor VARCHAR(100) NOT NULL,
-  clinico DECIMAL(10,2) DEFAULT 0,
-  raspagem DECIMAL(10,2) DEFAULT 0,
-  inicio DECIMAL(10,2) DEFAULT 0,
-  data_venda DATE NOT NULL,
-  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE metas (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  mes_referencia VARCHAR(7) NOT NULL,
-  promotor VARCHAR(100),
-  meta_vendas INT DEFAULT 0,
-  meta_faturamento DECIMAL(10,2) DEFAULT 0
-);
 ```
 
-### Backend
+O banco deve conter as tabelas `vendas`, `metas` e `promotores`, conforme a estrutura utilizada pela aplicação.
+
+### 3. Configurar o backend
+
+Entre na pasta:
 
 ```bash
 cd backend
 npm install
 ```
 
-Crie um arquivo `.env` na pasta `backend/` com:
-```
+Crie um arquivo `.env` dentro da pasta `backend`:
+
+```env
 DB_HOST=localhost
+DB_PORT=3306
 DB_USER=root
 DB_PASSWORD=sua_senha
 DB_NAME=gestao_vendas
 PORT=3000
 ```
 
-Rode o servidor:
+Inicie o servidor:
+
 ```bash
 npm run dev
 ```
-API disponível em `http://localhost:3000`
 
-### Frontend
+API disponível em `http://localhost:3000`.
+
+### 4. Configurar o frontend
+
+Em outro terminal, entre na pasta:
 
 ```bash
 cd frontend-react
 npm install
 npm run dev
 ```
-App disponível em `http://localhost:5173`
 
-## Rotas da API
+A aplicação estará disponível em `http://localhost:5173`.
+
+## Principais rotas da API
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/vendas` | Lista vendas (aceita `?promotor=&busca=&valorMin=&valorMax=`) |
-| POST | `/api/vendas` | Cria uma venda |
-| PUT | `/api/vendas/:id` | Edita uma venda |
-| DELETE | `/api/vendas/:id` | Remove uma venda |
-| GET | `/api/vendas/rankingPromotores` | Ranking de promotores (aceita `?mes=`) |
-| GET | `/api/metas` | Lista metas (aceita `?mes=`) |
-| POST | `/api/metas` | Cria ou atualiza uma meta |
-| DELETE | `/api/metas/:id` | Remove uma meta |
+| GET | `/api/vendas` | Lista e filtra vendas |
+| POST | `/api/vendas` | Cadastra uma venda |
+| PUT | `/api/vendas/:id` | Atualiza uma venda |
+| DELETE | `/api/vendas/:id` | Exclui uma venda |
+| GET | `/api/vendas/rankingPromotores?mes=AAAA-MM` | Consulta os rankings |
+| GET | `/api/metas` | Lista metas |
+| POST | `/api/metas` | Cadastra ou atualiza uma meta |
+| DELETE | `/api/metas/:id` | Exclui uma meta |
+| GET | `/api/promotores` | Lista promotores |
+| POST | `/api/promotores` | Cadastra um promotor |
+| PUT | `/api/promotores/:id` | Edita um promotor |
+| PATCH | `/api/promotores/:id/status` | Altera o status |
+| DELETE | `/api/promotores/:id` | Exclui um promotor |
 | GET | `/api/relatorios/pdf` | Gera relatório em PDF |
 
-## Roadmap
+## Documentação complementar
 
-- [x] Backend: CRUD de vendas
-- [x] Backend: ranking de promotores
-- [x] Backend: relatório em PDF
-- [x] Backend: CRUD de metas
-- [ ] Frontend: componentes e telas
-- [ ] Frontend: integração completa com a API
-- [ ] Autenticação de usuários
+O arquivo [`APRENDIZADO.md`](./APRENDIZADO.md) reúne anotações sobre os conceitos de programação, tecnologias e decisões técnicas utilizados durante o desenvolvimento.
+
+---
+
+**Status:** Projeto concluído.
