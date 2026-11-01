@@ -33,7 +33,7 @@ function lerNumeroFiltro(valor, nome) {
 
 
 // GET /api/relatorios/pdf
-// Gera um relatório de vendas em PDF.
+// Gera um relatório de vendas em PDF com os dois rankings.
 exports.gerarRelatorioPDF = async (req, res) => {
   try {
     const { promotor, busca, valorMin, valorMax, mes } = req.query;
@@ -109,22 +109,14 @@ exports.gerarRelatorioPDF = async (req, res) => {
 
     const [vendas] = await pool.query(sqlVendas, paramsVendas);
 
-    // Busca o ranking de promotores.
-    let sqlRanking = `
-      SELECT
-        promotor,
-        COUNT(*) AS total_vendas,
-        SUM(${totalVendaSQL}) AS faturamento_total
-      FROM vendas
-      WHERE 1 = 1
-    `;
-
+    // O filtro de mês é aplicado igualmente aos dois rankings.
+    let filtroMesSQL = '';
     const paramsRanking = [];
 
     if (mes) {
       const primeiroDia = `${mes}-01`;
 
-      sqlRanking += `
+      filtroMesSQL = `
         AND data_venda >= ?
         AND data_venda < DATE_ADD(?, INTERVAL 1 MONTH)
       `;
@@ -132,12 +124,39 @@ exports.gerarRelatorioPDF = async (req, res) => {
       paramsRanking.push(primeiroDia, primeiroDia);
     }
 
-    sqlRanking += `
+    // Ranking de início: conta somente vendas com início maior que zero.
+    const sqlRankingInicio = `
+      SELECT
+        promotor,
+        COUNT(*) AS total_inicios
+      FROM vendas
+      WHERE COALESCE(inicio, 0) > 0
+      ${filtroMesSQL}
       GROUP BY promotor
-      ORDER BY faturamento_total DESC, total_vendas DESC
+      ORDER BY total_inicios DESC, promotor ASC
     `;
 
-    const [ranking] = await pool.query(sqlRanking, paramsRanking);
+    // Ranking de faturamento: considera todos os procedimentos.
+    const sqlRankingFaturamento = `
+      SELECT
+        promotor,
+        COUNT(*) AS total_vendas,
+        SUM(${totalVendaSQL}) AS faturamento_total
+      FROM vendas
+      WHERE 1 = 1
+      ${filtroMesSQL}
+      GROUP BY promotor
+      HAVING SUM(${totalVendaSQL}) > 0
+      ORDER BY faturamento_total DESC, promotor ASC
+    `;
+
+    const [
+      [rankingInicio],
+      [rankingFaturamento]
+    ] = await Promise.all([
+      pool.query(sqlRankingInicio, paramsRanking),
+      pool.query(sqlRankingFaturamento, paramsRanking)
+    ]);
 
     // Cria o documento PDF.
     const doc = new PDFDocument({
@@ -192,32 +211,66 @@ exports.gerarRelatorioPDF = async (req, res) => {
 
     doc.moveDown(1.5);
 
-    // Seção de ranking.
-    escreverTexto('Ranking de Promotores', {
+    if (mes) {
+      escreverTexto(`Mês de referência: ${mes}`, {
+        fontSize: 10
+      });
+      doc.moveDown(0.8);
+    }
+
+    // Primeiro ranking: quantidade de inícios.
+    escreverTexto('Ranking de Inícios', {
       fontSize: 14,
       underline: true
     });
 
     doc.moveDown(0.5);
 
-    if (mes) {
-      escreverTexto(`Mês de referência: ${mes}`, {
-        fontSize: 10
-      });
-    }
-
-    if (ranking.length === 0) {
+    if (rankingInicio.length === 0) {
       escreverTexto(
-        'Nenhuma venda encontrada para o período informado.',
+        'Nenhum início encontrado para o período informado.',
         { fontSize: 10 }
       );
     } else {
-      ranking.forEach((item, indice) => {
+      rankingInicio.forEach((item, indice) => {
+        const quantidade = Number(item.total_inicios || 0);
+        const textoQuantidade = quantidade === 1
+          ? '1 início'
+          : `${quantidade} inícios`;
+
+        escreverTexto(
+          `${indice + 1}º - ${item.promotor} | ${textoQuantidade}`,
+          { fontSize: 10 }
+        );
+      });
+    }
+
+    doc.moveDown(1.2);
+
+    // Segundo ranking: soma dos valores dos procedimentos.
+    escreverTexto('Ranking de Faturamento', {
+      fontSize: 14,
+      underline: true
+    });
+
+    doc.moveDown(0.5);
+
+    if (rankingFaturamento.length === 0) {
+      escreverTexto(
+        'Nenhum faturamento encontrado para o período informado.',
+        { fontSize: 10 }
+      );
+    } else {
+      rankingFaturamento.forEach((item, indice) => {
         const total = Number(item.faturamento_total || 0);
+        const quantidade = Number(item.total_vendas || 0);
+        const textoVendas = quantidade === 1
+          ? '1 venda'
+          : `${quantidade} vendas`;
 
         escreverTexto(
           `${indice + 1}º - ${item.promotor} | ` +
-          `${item.total_vendas} vendas | ${moeda.format(total)}`,
+          `${textoVendas} | ${moeda.format(total)}`,
           { fontSize: 10 }
         );
       });

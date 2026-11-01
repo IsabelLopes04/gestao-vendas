@@ -35,10 +35,20 @@ export interface MetaInput {
   meta_faturamento: number;
 }
 
-export interface RankingItem {
+export interface RankingInicioItem {
+  promotor: string;
+  total_inicios: number | string;
+}
+
+export interface RankingFaturamentoItem {
   promotor: string;
   total_vendas: number | string;
   faturamento_total: number | string;
+}
+
+export interface RankingsPromotores {
+  inicio: RankingInicioItem[];
+  faturamento: RankingFaturamentoItem[];
 }
 
 export interface Promotor {

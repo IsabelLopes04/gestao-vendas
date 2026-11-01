@@ -358,7 +358,9 @@ exports.deletarVenda = async (req, res) => {
 
 
 // GET /api/vendas/rankingPromotores?mes=AAAA-MM
-// Gera o ranking dos promotores.
+// Retorna dois rankings independentes:
+// 1. Inícios: quantidade de vendas com inicio maior que zero.
+// 2. Faturamento: soma de todos os procedimentos de todas as vendas.
 exports.rankingPromotores = async (req, res) => {
   try {
     const { mes } = req.query;
@@ -369,42 +371,65 @@ exports.rankingPromotores = async (req, res) => {
       });
     }
 
-    let sql = `
+    let filtroMesSQL = '';
+    const paramsMes = [];
+
+    if (mes) {
+      const primeiroDia = `${mes}-01`;
+
+      filtroMesSQL = `
+        AND data_venda >= ?
+        AND data_venda < DATE_ADD(?, INTERVAL 1 MONTH)
+      `;
+
+      paramsMes.push(primeiroDia, primeiroDia);
+    }
+
+    // Ranking de início: só conta vendas em que o valor de início é maior que zero.
+    const sqlRankingInicio = `
+      SELECT
+        promotor,
+        COUNT(*) AS total_inicios
+      FROM vendas
+      WHERE COALESCE(inicio, 0) > 0
+      ${filtroMesSQL}
+      GROUP BY promotor
+      ORDER BY total_inicios DESC, promotor ASC
+    `;
+
+    // Ranking de faturamento: soma início, clínico e raspagem,
+    // mesmo quando a venda não possui valor de início.
+    const sqlRankingFaturamento = `
       SELECT
         promotor,
         COUNT(*) AS total_vendas,
         SUM(${totalVendaSQL}) AS faturamento_total
       FROM vendas
       WHERE 1 = 1
-    `;
-
-    const params = [];
-
-    if (mes) {
-      const primeiroDia = `${mes}-01`;
-
-      sql += `
-        AND data_venda >= ?
-        AND data_venda < DATE_ADD(?, INTERVAL 1 MONTH)
-      `;
-
-      params.push(primeiroDia, primeiroDia);
-    }
-
-    sql += `
+      ${filtroMesSQL}
       GROUP BY promotor
-      ORDER BY faturamento_total DESC, total_vendas DESC
+      HAVING SUM(${totalVendaSQL}) > 0
+      ORDER BY faturamento_total DESC, promotor ASC
     `;
 
-    const [rows] = await pool.query(sql, params);
+    const [
+      [rankingInicio],
+      [rankingFaturamento]
+    ] = await Promise.all([
+      pool.query(sqlRankingInicio, paramsMes),
+      pool.query(sqlRankingFaturamento, paramsMes)
+    ]);
 
-    res.json(rows);
+    res.json({
+      inicio: rankingInicio,
+      faturamento: rankingFaturamento
+    });
 
   } catch (err) {
-    console.error('Erro ao buscar ranking:', err);
+    console.error('Erro ao buscar rankings:', err);
 
     res.status(500).json({
-      erro: 'Erro ao buscar ranking'
+      erro: 'Erro ao buscar rankings'
     });
   }
 };

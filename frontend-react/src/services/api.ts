@@ -3,7 +3,7 @@ import type {
   MetaInput,
   Promotor,
   PromotorInput,
-  RankingItem,
+  RankingsPromotores,
   ReportFilters,
   Venda,
   VendaInput,
@@ -178,11 +178,11 @@ export const api = {
     }),
 
   // =========================
-  // RANKING
+  // RANKINGS
   // =========================
 
   rankingPromotores: (mes: string) =>
-    request<RankingItem[]>(
+    request<RankingsPromotores>(
       `/api/vendas/rankingPromotores${toQuery({ mes })}`
     ),
 

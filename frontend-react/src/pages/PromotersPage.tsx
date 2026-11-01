@@ -5,25 +5,20 @@ import {
   type CSSProperties,
   type FormEvent,
 } from 'react';
-
 interface Promotor {
   id: number;
   nome: string;
   ativo: boolean | number | string;
   criado_em?: string | null;
 }
-
 interface PromotersPageProps {
   onChanged: () => void;
   onNotify: (message: string, type?: 'success' | 'error') => void;
 }
-
 type StatusFilter = 'todos' | 'ativos' | 'inativos';
-
 const API_BASE_URL = (
   import.meta.env.VITE_API_URL || 'http://localhost:3000'
 ).replace(/\/$/, '');
-
 const estilos: Record<string, CSSProperties> = {
   pagina: {
     display: 'flex',
@@ -208,7 +203,6 @@ const estilos: Record<string, CSSProperties> = {
     marginTop: '24px',
   },
 };
-
 function isPromotorAtivo(ativo: Promotor['ativo']): boolean {
   return (
     ativo === true ||
@@ -217,25 +211,20 @@ function isPromotorAtivo(ativo: Promotor['ativo']): boolean {
     ativo === 'true'
   );
 }
-
 function obterMensagemErro(erro: unknown): string {
   return erro instanceof Error
     ? erro.message
     : 'Ocorreu um erro inesperado.';
 }
-
 async function apiRequest<T>(
   caminho: string,
   opcoes: RequestInit = {},
 ): Promise<T> {
   const headers = new Headers(opcoes.headers);
-
   if (opcoes.body && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
-
   let resposta: Response;
-
   try {
     resposta = await fetch(`${API_BASE_URL}${caminho}`, {
       ...opcoes,
@@ -246,11 +235,8 @@ async function apiRequest<T>(
       'Não foi possível conectar ao servidor. Verifique se o backend está rodando.',
     );
   }
-
   const texto = await resposta.text();
-
   let dados: unknown = null;
-
   if (texto) {
     try {
       dados = JSON.parse(texto);
@@ -258,39 +244,28 @@ async function apiRequest<T>(
       dados = null;
     }
   }
-
   if (!resposta.ok) {
     let mensagem = `Erro ${resposta.status} ao realizar a operação.`;
-
     if (dados && typeof dados === 'object') {
       const objeto = dados as Record<string, unknown>;
-
       if (typeof objeto.erro === 'string') {
         mensagem = objeto.erro;
       } else if (typeof objeto.mensagem === 'string') {
         mensagem = objeto.mensagem;
       }
     }
-
     throw new Error(mensagem);
   }
-
   return dados as T;
 }
-
 function formatarData(data?: string | null): string {
   if (!data) return '—';
-
   const dataNormalizada = data.substring(0, 10);
   const partes = dataNormalizada.split('-');
-
   if (partes.length !== 3) return data;
-
   const [ano, mes, dia] = partes;
-
   return `${dia}/${mes}/${ano}`;
 }
-
 export function PromotersPage({
   onChanged,
   onNotify,
@@ -300,26 +275,20 @@ export function PromotersPage({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [formError, setFormError] = useState('');
-
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] =
     useState<StatusFilter>('todos');
-
   const [modalOpen, setModalOpen] = useState(false);
   const [nome, setNome] = useState('');
   const [promotorEditando, setPromotorEditando] =
     useState<Promotor | null>(null);
-
   const [updatingId, setUpdatingId] = useState<number | null>(null);
-
   // Carregamento inicial dos promotores.
   useEffect(() => {
     let componenteAtivo = true;
-
     async function carregarInicialmente() {
       try {
         const dados = await apiRequest<Promotor[]>('/api/promotores');
-
         if (componenteAtivo) {
           setPromotores(Array.isArray(dados) ? dados : []);
           setError('');
@@ -334,22 +303,17 @@ export function PromotersPage({
         }
       }
     }
-
     void carregarInicialmente();
-
     return () => {
       componenteAtivo = false;
     };
   }, []);
-
   // Atualiza a lista quando necessário.
   async function carregarPromotores(): Promise<void> {
     setLoading(true);
     setError('');
-
     try {
       const dados = await apiRequest<Promotor[]>('/api/promotores');
-
       setPromotores(Array.isArray(dados) ? dados : []);
     } catch (erro: unknown) {
       setError(obterMensagemErro(erro));
@@ -357,49 +321,39 @@ export function PromotersPage({
       setLoading(false);
     }
   }
-
   function abrirCadastro() {
     setPromotorEditando(null);
     setNome('');
     setFormError('');
     setModalOpen(true);
   }
-
   function abrirEdicao(promotor: Promotor) {
     setPromotorEditando(promotor);
     setNome(promotor.nome);
     setFormError('');
     setModalOpen(true);
   }
-
   function fecharModal() {
     if (saving) return;
-
     setModalOpen(false);
     setPromotorEditando(null);
     setNome('');
     setFormError('');
   }
-
   // Cadastrar ou editar promotor.
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
     const nomeLimpo = nome.trim();
-
     if (!nomeLimpo) {
       setFormError('Informe o nome do promotor.');
       return;
     }
-
     if (nomeLimpo.length > 100) {
       setFormError('O nome deve ter no máximo 100 caracteres.');
       return;
     }
-
     setSaving(true);
     setFormError('');
-
     try {
       if (promotorEditando) {
         await apiRequest(
@@ -415,15 +369,11 @@ export function PromotersPage({
           body: JSON.stringify({ nome: nomeLimpo }),
         });
       }
-
       setModalOpen(false);
       setPromotorEditando(null);
       setNome('');
-
       await carregarPromotores();
-
       onChanged();
-
       onNotify(
         promotorEditando
           ? 'Promotor atualizado com sucesso.'
@@ -432,29 +382,22 @@ export function PromotersPage({
       );
     } catch (erro: unknown) {
       const mensagem = obterMensagemErro(erro);
-
       setFormError(mensagem);
       onNotify(mensagem, 'error');
     } finally {
       setSaving(false);
     }
   }
-
   // Ativar ou desativar promotor.
   async function handleToggleStatus(promotor: Promotor) {
     const ativoAtual = isPromotorAtivo(promotor.ativo);
     const novoStatus = !ativoAtual;
-
     const acao = novoStatus ? 'reativar' : 'desativar';
-
     const confirmou = window.confirm(
       `Deseja ${acao} o promotor "${promotor.nome}"?`,
     );
-
     if (!confirmou) return;
-
     setUpdatingId(promotor.id);
-
     try {
       await apiRequest(
         `/api/promotores/${promotor.id}/status`,
@@ -463,11 +406,8 @@ export function PromotersPage({
           body: JSON.stringify({ ativo: novoStatus }),
         },
       );
-
       await carregarPromotores();
-
       onChanged();
-
       onNotify(
         novoStatus
           ? 'Promotor reativado com sucesso.'
@@ -480,43 +420,62 @@ export function PromotersPage({
       setUpdatingId(null);
     }
   }
-
+  async function handleDeletePermanent(promotor: Promotor) {
+  const confirmou = window.confirm(
+    `ATENÇÃO: deseja excluir permanentemente o promotor "${promotor.nome}"?\n\n` +
+    'As vendas e metas antigas serão preservadas no histórico. Essa ação não pode ser desfeita.'
+  );
+  if (!confirmou) return;
+  setUpdatingId(promotor.id);
+  try {
+    await apiRequest(`/api/promotores/${promotor.id}`, {
+      method: 'DELETE',
+    });
+    await carregarPromotores();
+    onChanged();
+    onNotify(
+      'Promotor excluído permanentemente. O histórico foi preservado.',
+      'success'
+    );
+  } catch (erro: unknown) {
+    onNotify(
+      erro instanceof Error
+        ? erro.message
+        : 'Não foi possível excluir o promotor.',
+      'error'
+    );
+  } finally {
+    setUpdatingId(null);
+  }
+}
   // Busca e filtros.
   const promotoresFiltrados = useMemo(() => {
     return promotores.filter((promotor) => {
       const nomeCorresponde = promotor.nome
         .toLocaleLowerCase('pt-BR')
         .includes(busca.trim().toLocaleLowerCase('pt-BR'));
-
       const ativo = isPromotorAtivo(promotor.ativo);
-
       const statusCorresponde =
         filtroStatus === 'todos' ||
         (filtroStatus === 'ativos' && ativo) ||
         (filtroStatus === 'inativos' && !ativo);
-
       return nomeCorresponde && statusCorresponde;
     });
   }, [promotores, busca, filtroStatus]);
-
   const totalAtivos = promotores.filter((promotor) =>
     isPromotorAtivo(promotor.ativo),
   ).length;
-
   const totalInativos = promotores.length - totalAtivos;
-
   return (
     <main style={estilos.pagina}>
       {/* Cabeçalho */}
       <header style={estilos.cabecalho}>
         <div>
           <h2 style={estilos.titulo}>Cadastro de promotores</h2>
-
           <p style={estilos.descricao}>
             Cadastre, edite e controle os promotores do sistema.
           </p>
         </div>
-
         <div style={estilos.botoes}>
           <button
             type="button"
@@ -530,7 +489,6 @@ export function PromotersPage({
           >
             Atualizar
           </button>
-
           <button
             type="button"
             style={{
@@ -543,7 +501,6 @@ export function PromotersPage({
           </button>
         </div>
       </header>
-
       {/* Indicadores */}
       <section style={estilos.cards}>
         <div style={estilos.card}>
@@ -551,25 +508,21 @@ export function PromotersPage({
           <p style={estilos.cardValor}>{promotores.length}</p>
           <p style={estilos.cardLabel}>Promotores cadastrados</p>
         </div>
-
         <div style={estilos.card}>
           <p style={estilos.cardLabel}>Promotores ativos</p>
           <p style={estilos.cardValor}>{totalAtivos}</p>
           <p style={estilos.cardLabel}>Disponíveis para novas vendas</p>
         </div>
-
         <div style={estilos.card}>
           <p style={estilos.cardLabel}>Promotores inativos</p>
           <p style={estilos.cardValor}>{totalInativos}</p>
           <p style={estilos.cardLabel}>Cadastros desativados</p>
         </div>
       </section>
-
       {/* Mensagem de erro */}
       {error && (
         <div style={estilos.alerta} role="alert">
           <p>{error}</p>
-
           <button
             type="button"
             onClick={() => void carregarPromotores()}
@@ -582,19 +535,16 @@ export function PromotersPage({
           </button>
         </div>
       )}
-
       {/* Tabela de promotores */}
       <section style={estilos.painel}>
         <div style={estilos.painelCabecalho}>
           <h3 style={{ margin: 0, color: '#25312c' }}>
             Promotores cadastrados
           </h3>
-
           <p style={estilos.descricao}>
             {promotoresFiltrados.length} resultado(s) encontrado(s).
           </p>
         </div>
-
         {/* Filtros */}
         <div style={estilos.filtros}>
           <input
@@ -604,7 +554,6 @@ export function PromotersPage({
             onChange={(event) => setBusca(event.target.value)}
             style={estilos.campo}
           />
-
           <select
             value={filtroStatus}
             onChange={(event) =>
@@ -617,7 +566,6 @@ export function PromotersPage({
             <option value="inativos">Somente inativos</option>
           </select>
         </div>
-
         {loading ? (
           <div style={estilos.vazio}>
             Carregando promotores...
@@ -646,22 +594,18 @@ export function PromotersPage({
                   </th>
                 </tr>
               </thead>
-
               <tbody>
                 {promotoresFiltrados.map((promotor) => {
                   const ativo = isPromotorAtivo(promotor.ativo);
                   const atualizando = updatingId === promotor.id;
-
                   return (
                     <tr key={promotor.id}>
                       <td style={estilos.celula}>
                         <strong>{promotor.nome}</strong>
                       </td>
-
                       <td style={estilos.celula}>
                         {formatarData(promotor.criado_em)}
                       </td>
-
                       <td style={estilos.celula}>
                         <span
                           style={{
@@ -676,7 +620,6 @@ export function PromotersPage({
                           {ativo ? 'Ativo' : 'Inativo'}
                         </span>
                       </td>
-
                       <td style={estilos.celula}>
                         <div style={estilos.acoes}>
                           <button
@@ -690,7 +633,6 @@ export function PromotersPage({
                           >
                             Editar
                           </button>
-
                           <button
                             type="button"
                             style={{
@@ -708,6 +650,19 @@ export function PromotersPage({
                                 ? 'Desativar'
                                 : 'Reativar'}
                           </button>
+                          <button
+                            type="button"
+                            style={{
+                              ...estilos.botaoAcao,
+                              borderColor: '#e8c5c5',
+                              color: '#a33b35',
+                              ...(atualizando ? estilos.desabilitado : {}),
+                            }}
+                            onClick={() => void handleDeletePermanent(promotor)}
+                            disabled={atualizando}
+                          >
+                            {atualizando ? 'Aguarde...' : 'Excluir'}
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -718,7 +673,6 @@ export function PromotersPage({
           </div>
         )}
       </section>
-
       {/* Modal de cadastro e edição */}
       {modalOpen && (
         <div
@@ -740,13 +694,11 @@ export function PromotersPage({
                 ? 'Editar promotor'
                 : 'Cadastrar promotor'}
             </h3>
-
             <p style={estilos.descricao}>
               {promotorEditando
                 ? 'Altere o nome do promotor.'
                 : 'Informe o nome do novo promotor.'}
             </p>
-
             <form onSubmit={handleSubmit}>
               <div style={estilos.campoGrupo}>
                 <label
@@ -755,7 +707,6 @@ export function PromotersPage({
                 >
                   Nome do promotor
                 </label>
-
                 <input
                   id="nome-promotor"
                   type="text"
@@ -768,7 +719,6 @@ export function PromotersPage({
                   style={estilos.campo}
                 />
               </div>
-
               {formError && (
                 <p
                   role="alert"
@@ -781,7 +731,6 @@ export function PromotersPage({
                   {formError}
                 </p>
               )}
-
               <div style={estilos.modalAcoes}>
                 <button
                   type="button"
@@ -794,7 +743,6 @@ export function PromotersPage({
                 >
                   Cancelar
                 </button>
-
                 <button
                   type="submit"
                   style={{

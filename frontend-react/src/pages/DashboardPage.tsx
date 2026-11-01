@@ -1,4 +1,4 @@
-import type { Meta, RankingItem, Venda } from '../types';
+import type { Meta, RankingsPromotores, Venda } from '../types';
 import {
   formatCurrency,
   formatDate,
@@ -163,7 +163,7 @@ export function DashboardPage({
 }: {
   sales: Venda[];
   metas: Meta[];
-  ranking: RankingItem[];
+  ranking: RankingsPromotores;
   month: string;
   onMonthChange: (month: string) => void;
   loading: boolean;
@@ -214,7 +214,15 @@ export function DashboardPage({
     )
     .slice(0, 5);
 
-  const topRanking = [...ranking]
+  const topRankingInicio = [...ranking.inicio]
+    .sort(
+      (a, b) =>
+        toNumber(b.total_inicios) -
+        toNumber(a.total_inicios)
+    )
+    .slice(0, 5);
+
+  const topRankingFaturamento = [...ranking.faturamento]
     .sort(
       (a, b) =>
         toNumber(b.faturamento_total) -
@@ -378,8 +386,8 @@ export function DashboardPage({
         <article className="panel">
           <div className="panel-heading">
             <div>
-              <h3>Ranking de promotores</h3>
-              <p>Classificação por faturamento no mês</p>
+              <h3>Ranking de início</h3>
+              <p>Quantidade de inícios no mês</p>
             </div>
 
             <span className="panel-icon">
@@ -387,9 +395,56 @@ export function DashboardPage({
             </span>
           </div>
 
-          {topRanking.length ? (
+          {topRankingInicio.length ? (
             <div className="ranking-list">
-              {topRanking.map((item, index) => (
+              {topRankingInicio.map((item, index) => {
+                const quantidade = toNumber(item.total_inicios);
+
+                return (
+                  <div className="ranking-row" key={item.promotor}>
+                    <span
+                      className={`ranking-position ${
+                        index === 0 ? 'first' : ''
+                      }`}
+                    >
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+
+                    <div className="ranking-person">
+                      <strong>{item.promotor}</strong>
+                      <span>Inícios registrados no período</span>
+                    </div>
+
+                    <strong className="ranking-value">
+                      {quantidade} {quantidade === 1 ? 'início' : 'inícios'}
+                    </strong>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <EmptyState
+              title="Nenhum início neste período"
+              description="O ranking aparece quando houver vendas com o campo início preenchido."
+            />
+          )}
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading">
+            <div>
+              <h3>Ranking de faturamento</h3>
+              <p>Maior soma dos procedimentos no mês</p>
+            </div>
+
+            <span className="panel-icon">
+              <Icon name="wallet" size={18} />
+            </span>
+          </div>
+
+          {topRankingFaturamento.length ? (
+            <div className="ranking-list">
+              {topRankingFaturamento.map((item, index) => (
                 <div className="ranking-row" key={item.promotor}>
                   <span
                     className={`ranking-position ${
@@ -401,9 +456,7 @@ export function DashboardPage({
 
                   <div className="ranking-person">
                     <strong>{item.promotor}</strong>
-                    <span>
-                      {toNumber(item.total_vendas)} vendas
-                    </span>
+                    <span>{toNumber(item.total_vendas)} vendas</span>
                   </div>
 
                   <strong className="ranking-value">
@@ -414,8 +467,8 @@ export function DashboardPage({
             </div>
           ) : (
             <EmptyState
-              title="Ranking indisponível"
-              description="Ainda não há vendas para este período."
+              title="Nenhum faturamento neste período"
+              description="O ranking aparece quando houver vendas com valores registrados."
             />
           )}
         </article>

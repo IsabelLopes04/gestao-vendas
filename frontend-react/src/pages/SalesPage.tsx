@@ -1,30 +1,12 @@
-import {
-  useEffect,
-  useMemo,
-  useState,
-  type FormEvent,
-} from 'react';
-
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { api } from '../services/api';
-import type { Venda, VendaInput } from '../types';
-
-import {
-  formatCurrency,
-  formatDate,
-  toNumber,
-  totalVenda,
-} from '../utils/formatters';
-
+import type { Promotor, Venda, VendaInput } from '../types';
+import { formatCurrency, formatDate, toNumber, totalVenda } from '../utils/formatters';
 import { EmptyState, Icon, Modal } from '../components/ui';
 
 function emptyForm(): VendaInput {
   const now = new Date();
-
-  const today = `${now.getFullYear()}-${String(
-    now.getMonth() + 1
-  ).padStart(2, '0')}-${String(
-    now.getDate()
-  ).padStart(2, '0')}`;
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
   return {
     codigo: '',
@@ -46,79 +28,79 @@ export function SalesPage({
   sales: Venda[];
   openSignal: number;
   onChanged: () => Promise<void> | void;
-  onNotify: (
-    message: string,
-    type?: 'success' | 'error'
-  ) => void;
+  onNotify: (message: string, type?: 'success' | 'error') => void;
 }) {
   const [search, setSearch] = useState('');
   const [promoterFilter, setPromoterFilter] = useState('');
   const [minimum, setMinimum] = useState('');
   const [maximum, setMaximum] = useState('');
-
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Venda | null>(null);
   const [form, setForm] = useState<VendaInput>(emptyForm);
-
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [formError, setFormError] = useState('');
 
+  // Promotores disponíveis para novos cadastros (somente ativos).
+  const [registeredPromoters, setRegisteredPromoters] = useState<Promotor[]>([]);
+  const [promotersLoading, setPromotersLoading] = useState(true);
+  const [promotersError, setPromotersError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRegisteredPromoters() {
+      try {
+        const result = await api.listarPromotores(true);
+        if (!active) return;
+        setRegisteredPromoters(Array.isArray(result) ? result : []);
+        setPromotersError('');
+      } catch (error) {
+        if (!active) return;
+        setPromotersError(
+          error instanceof Error
+            ? error.message
+            : 'Não foi possível carregar os promotores cadastrados.',
+        );
+      } finally {
+        if (active) setPromotersLoading(false);
+      }
+    }
+
+    void loadRegisteredPromoters();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (openSignal > 0) openCreateModal();
-
     // openSignal representa o pedido de abertura enviado pelo cabeçalho.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSignal]);
 
+  // Esta lista é usada somente no filtro do histórico de vendas.
   const promoters = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          sales
-            .map((sale) => sale.promotor)
-            .filter(Boolean)
-        )
-      ).sort((a, b) => a.localeCompare(b, 'pt-BR')),
-    [sales]
+    () => Array.from(new Set(sales.map((sale) => sale.promotor).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR')),
+    [sales],
   );
 
   const filteredSales = useMemo(() => {
-    const normalizedSearch = search
-      .trim()
-      .toLocaleLowerCase('pt-BR');
+    const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR');
 
     return [...sales]
       .filter((sale) => {
-        const matchesSearch =
-          !normalizedSearch ||
-          `${sale.codigo} ${sale.paciente} ${sale.promotor}`
-            .toLocaleLowerCase('pt-BR')
-            .includes(normalizedSearch);
-
-        const matchesPromoter =
-          !promoterFilter || sale.promotor === promoterFilter;
-
+        const matchesSearch = !normalizedSearch ||
+          `${sale.codigo} ${sale.paciente} ${sale.promotor}`.toLocaleLowerCase('pt-BR').includes(normalizedSearch);
+        const matchesPromoter = !promoterFilter || sale.promotor === promoterFilter;
         const total = totalVenda(sale);
+        const matchesMinimum = minimum === '' || total >= toNumber(minimum);
+        const matchesMaximum = maximum === '' || total <= toNumber(maximum);
 
-        const matchesMinimum =
-          minimum === '' || total >= toNumber(minimum);
-
-        const matchesMaximum =
-          maximum === '' || total <= toNumber(maximum);
-
-        return (
-          matchesSearch &&
-          matchesPromoter &&
-          matchesMinimum &&
-          matchesMaximum
-        );
+        return matchesSearch && matchesPromoter && matchesMinimum && matchesMaximum;
       })
-      .sort(
-        (a, b) =>
-          b.data_venda.localeCompare(a.data_venda) ||
-          b.id - a.id
-      );
+      .sort((a, b) => b.data_venda.localeCompare(a.data_venda) || b.id - a.id);
   }, [sales, search, promoterFilter, minimum, maximum]);
 
   function openCreateModal() {
@@ -130,7 +112,6 @@ export function SalesPage({
 
   function openEditModal(sale: Venda) {
     setEditing(sale);
-
     setForm({
       codigo: sale.codigo,
       paciente: sale.paciente,
@@ -140,24 +121,15 @@ export function SalesPage({
       inicio: toNumber(sale.inicio),
       data_venda: sale.data_venda.slice(0, 10),
     });
-
     setFormError('');
     setModalOpen(true);
   }
 
-  function updateField<K extends keyof VendaInput>(
-    field: K,
-    value: VendaInput[K]
-  ) {
-    setForm((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  function updateField<K extends keyof VendaInput>(field: K, value: VendaInput[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
   }
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>
-  ) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setFormError('');
 
@@ -171,30 +143,13 @@ export function SalesPage({
       inicio: Number(form.inicio),
     };
 
-    if (
-      !payload.codigo ||
-      !payload.paciente ||
-      !payload.promotor ||
-      !payload.data_venda
-    ) {
-      setFormError(
-        'Preencha código, paciente, promotor e data da venda.'
-      );
+    if (!payload.codigo || !payload.paciente || !payload.promotor || !payload.data_venda) {
+      setFormError('Preencha código, paciente, promotor e data da venda.');
       return;
     }
 
-    if (
-      [
-        payload.clinico,
-        payload.raspagem,
-        payload.inicio,
-      ].some(
-        (value) => !Number.isFinite(value) || value < 0
-      )
-    ) {
-      setFormError(
-        'Os valores dos procedimentos devem ser números iguais ou maiores que zero.'
-      );
+    if ([payload.clinico, payload.raspagem, payload.inicio].some((value) => !Number.isFinite(value) || value < 0)) {
+      setFormError('Os valores dos procedimentos devem ser números iguais ou maiores que zero.');
       return;
     }
 
@@ -212,21 +167,14 @@ export function SalesPage({
       setModalOpen(false);
       await onChanged();
     } catch (error) {
-      setFormError(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível salvar a venda.'
-      );
+      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar a venda.');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(sale: Venda) {
-    const confirmed = window.confirm(
-      `Deseja realmente excluir a venda ${sale.codigo}?`
-    );
-
+    const confirmed = window.confirm(`Deseja realmente excluir a venda ${sale.codigo}?`);
     if (!confirmed) return;
 
     setDeletingId(sale.id);
@@ -236,21 +184,15 @@ export function SalesPage({
       onNotify('Venda excluída com sucesso.');
       await onChanged();
     } catch (error) {
-      onNotify(
-        error instanceof Error
-          ? error.message
-          : 'Não foi possível excluir a venda.',
-        'error'
-      );
+      onNotify(error instanceof Error ? error.message : 'Não foi possível excluir a venda.', 'error');
     } finally {
       setDeletingId(null);
     }
   }
 
-  const visibleRevenue = filteredSales.reduce(
-    (sum, sale) => sum + totalVenda(sale),
-    0
-  );
+  const visibleRevenue = filteredSales.reduce((sum, sale) => sum + totalVenda(sale), 0);
+  const promoterIsAvailable = registeredPromoters.some((promoter) => promoter.nome === form.promotor);
+  const showLegacyPromoterOption = Boolean(form.promotor) && !promoterIsAvailable;
 
   return (
     <div className="page-stack">
@@ -258,28 +200,16 @@ export function SalesPage({
         <div>
           <span className="stat-label">Vendas encontradas</span>
           <strong>{filteredSales.length}</strong>
-          <span className="stat-note">
-            de {sales.length} registros
-          </span>
+          <span className="stat-note">de {sales.length} registros</span>
         </div>
-
         <div className="summary-divider" />
-
         <div>
           <span className="stat-label">Faturamento filtrado</span>
           <strong>{formatCurrency(visibleRevenue)}</strong>
-          <span className="stat-note">
-            Soma dos procedimentos exibidos
-          </span>
+          <span className="stat-note">Soma dos procedimentos exibidos</span>
         </div>
-
-        <button
-          type="button"
-          className="button button-primary"
-          onClick={openCreateModal}
-        >
-          <Icon name="plus" size={17} />
-          Nova venda
+        <button type="button" className="button button-primary" onClick={openCreateModal}>
+          <Icon name="plus" size={17} /> Nova venda
         </button>
       </section>
 
@@ -287,70 +217,28 @@ export function SalesPage({
         <div className="table-toolbar">
           <div>
             <h3>Todas as vendas</h3>
-            <p>
-              Use os filtros para encontrar um registro específico.
-            </p>
+            <p>Use os filtros para encontrar um registro específico.</p>
           </div>
-
           <button
             type="button"
             className="button button-quiet"
-            onClick={() => {
-              setSearch('');
-              setPromoterFilter('');
-              setMinimum('');
-              setMaximum('');
-            }}
+            onClick={() => { setSearch(''); setPromoterFilter(''); setMinimum(''); setMaximum(''); }}
           >
-            <Icon name="refresh" size={16} />
-            Limpar filtros
+            <Icon name="refresh" size={16} /> Limpar filtros
           </button>
         </div>
 
         <div className="filters-grid sales-filters">
           <label className="search-field">
             <Icon name="search" size={17} />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Buscar código, paciente ou promotor"
-            />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar código, paciente ou promotor" />
           </label>
-
-          <select
-            value={promoterFilter}
-            onChange={(event) =>
-              setPromoterFilter(event.target.value)
-            }
-            aria-label="Filtrar por promotor"
-          >
+          <select value={promoterFilter} onChange={(event) => setPromoterFilter(event.target.value)} aria-label="Filtrar por promotor">
             <option value="">Todos os promotores</option>
-            {promoters.map((promoter) => (
-              <option key={promoter} value={promoter}>
-                {promoter}
-              </option>
-            ))}
+            {promoters.map((promoter) => <option key={promoter} value={promoter}>{promoter}</option>)}
           </select>
-
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={minimum}
-            onChange={(event) => setMinimum(event.target.value)}
-            placeholder="Valor mínimo"
-            aria-label="Valor mínimo"
-          />
-
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={maximum}
-            onChange={(event) => setMaximum(event.target.value)}
-            placeholder="Valor máximo"
-            aria-label="Valor máximo"
-          />
+          <input type="number" min="0" step="0.01" value={minimum} onChange={(event) => setMinimum(event.target.value)} placeholder="Valor mínimo" aria-label="Valor mínimo" />
+          <input type="number" min="0" step="0.01" value={maximum} onChange={(event) => setMaximum(event.target.value)} placeholder="Valor máximo" aria-label="Valor máximo" />
         </div>
 
         {filteredSales.length ? (
@@ -366,50 +254,20 @@ export function SalesPage({
                   <th className="align-right">Ações</th>
                 </tr>
               </thead>
-
               <tbody>
                 {filteredSales.map((sale) => (
                   <tr key={sale.id}>
-                    <td className="muted-cell">
-                      {formatDate(sale.data_venda)}
-                    </td>
-
-                    <td>
-                      <span className="code-pill">
-                        {sale.codigo}
-                      </span>
-                    </td>
-
-                    <td className="primary-cell">
-                      {sale.paciente}
-                    </td>
-
+                    <td className="muted-cell">{formatDate(sale.data_venda)}</td>
+                    <td><span className="code-pill">{sale.codigo}</span></td>
+                    <td className="primary-cell">{sale.paciente}</td>
                     <td>{sale.promotor}</td>
-
-                    <td className="align-right amount-cell">
-                      {formatCurrency(totalVenda(sale))}
-                    </td>
-
+                    <td className="align-right amount-cell">{formatCurrency(totalVenda(sale))}</td>
                     <td>
                       <div className="row-actions">
-                        <button
-                          type="button"
-                          className="icon-button"
-                          onClick={() => openEditModal(sale)}
-                          aria-label={`Editar venda ${sale.codigo}`}
-                          title="Editar"
-                        >
+                        <button type="button" className="icon-button" onClick={() => openEditModal(sale)} aria-label={`Editar venda ${sale.codigo}`} title="Editar">
                           <Icon name="edit" size={16} />
                         </button>
-
-                        <button
-                          type="button"
-                          className="icon-button danger-hover"
-                          onClick={() => handleDelete(sale)}
-                          disabled={deletingId === sale.id}
-                          aria-label={`Excluir venda ${sale.codigo}`}
-                          title="Excluir"
-                        >
+                        <button type="button" className="icon-button danger-hover" onClick={() => void handleDelete(sale)} disabled={deletingId === sale.id} aria-label={`Excluir venda ${sale.codigo}`} title="Excluir">
                           <Icon name="trash" size={16} />
                         </button>
                       </div>
@@ -421,16 +279,8 @@ export function SalesPage({
           </div>
         ) : (
           <EmptyState
-            title={
-              sales.length
-                ? 'Nenhum resultado encontrado'
-                : 'Nenhuma venda cadastrada'
-            }
-            description={
-              sales.length
-                ? 'Tente alterar ou limpar os filtros.'
-                : 'Cadastre a primeira venda para começar a acompanhar os resultados.'
-            }
+            title={sales.length ? 'Nenhum resultado encontrado' : 'Nenhuma venda cadastrada'}
+            description={sales.length ? 'Tente alterar ou limpar os filtros.' : 'Cadastre a primeira venda para começar a acompanhar os resultados.'}
           />
         )}
       </section>
@@ -445,135 +295,64 @@ export function SalesPage({
           <div className="form-grid two-columns">
             <label className="form-field">
               <span>Código *</span>
-              <input
-                value={form.codigo}
-                onChange={(event) =>
-                  updateField('codigo', event.target.value)
-                }
-                maxLength={50}
-                required
-                autoFocus
-              />
+              <input value={form.codigo} onChange={(event) => updateField('codigo', event.target.value)} maxLength={50} required autoFocus />
             </label>
-
             <label className="form-field">
               <span>Data da venda *</span>
-              <input
-                type="date"
-                value={form.data_venda}
-                onChange={(event) =>
-                  updateField('data_venda', event.target.value)
-                }
-                required
-              />
+              <input type="date" value={form.data_venda} onChange={(event) => updateField('data_venda', event.target.value)} required />
             </label>
-
             <label className="form-field">
               <span>Paciente *</span>
-              <input
-                value={form.paciente}
-                onChange={(event) =>
-                  updateField('paciente', event.target.value)
-                }
-                maxLength={150}
-                required
-              />
+              <input value={form.paciente} onChange={(event) => updateField('paciente', event.target.value)} maxLength={150} required />
             </label>
-
             <label className="form-field">
               <span>Promotor *</span>
-              <input
+              <select
                 value={form.promotor}
-                onChange={(event) =>
-                  updateField('promotor', event.target.value)
-                }
-                maxLength={100}
+                onChange={(event) => updateField('promotor', event.target.value)}
                 required
-              />
+                disabled={promotersLoading}
+              >
+                <option value="">
+                  {promotersLoading ? 'Carregando promotores...' : 'Selecione um promotor'}
+                </option>
+                {showLegacyPromoterOption && (
+                  <option value={form.promotor}>{form.promotor} (inativo ou excluído)</option>
+                )}
+                {registeredPromoters.map((promoter) => (
+                  <option key={promoter.id} value={promoter.nome}>{promoter.nome}</option>
+                ))}
+              </select>
             </label>
           </div>
 
-          <div className="form-section-title">
-            Valores dos procedimentos
-          </div>
+          {promotersError && <div className="form-error" role="alert">{promotersError}</div>}
+          {!promotersLoading && !promotersError && registeredPromoters.length === 0 && !form.promotor && (
+            <div className="form-error" role="status">Nenhum promotor ativo cadastrado. Cadastre ou reative um promotor antes de registrar uma nova venda.</div>
+          )}
 
+          <div className="form-section-title">Valores dos procedimentos</div>
           <div className="form-grid three-columns">
             <label className="form-field">
               <span>Clínico (R$)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.clinico}
-                onChange={(event) =>
-                  updateField('clinico', Number(event.target.value))
-                }
-              />
+              <input type="number" min="0" step="0.01" value={form.clinico} onChange={(event) => updateField('clinico', Number(event.target.value))} />
             </label>
-
             <label className="form-field">
               <span>Raspagem (R$)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.raspagem}
-                onChange={(event) =>
-                  updateField('raspagem', Number(event.target.value))
-                }
-              />
+              <input type="number" min="0" step="0.01" value={form.raspagem} onChange={(event) => updateField('raspagem', Number(event.target.value))} />
             </label>
-
             <label className="form-field">
               <span>Início (R$)</span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.inicio}
-                onChange={(event) =>
-                  updateField('inicio', Number(event.target.value))
-                }
-              />
+              <input type="number" min="0" step="0.01" value={form.inicio} onChange={(event) => updateField('inicio', Number(event.target.value))} />
             </label>
           </div>
 
-          <div className="form-total">
-            <span>Total da venda</span>
-            <strong>
-              {formatCurrency(
-                toNumber(form.clinico) +
-                toNumber(form.raspagem) +
-                toNumber(form.inicio)
-              )}
-            </strong>
-          </div>
-
-          {formError && (
-            <div className="form-error" role="alert">
-              {formError}
-            </div>
-          )}
-
+          <div className="form-total"><span>Total da venda</span><strong>{formatCurrency(toNumber(form.clinico) + toNumber(form.raspagem) + toNumber(form.inicio))}</strong></div>
+          {formError && <div className="form-error" role="alert">{formError}</div>}
           <div className="modal-actions">
-            <button
-              type="button"
-              className="button button-secondary"
-              onClick={() => setModalOpen(false)}
-            >
-              Cancelar
-            </button>
-
-            <button
-              type="submit"
-              className="button button-primary"
-              disabled={saving}
-            >
-              {saving
-                ? 'Salvando...'
-                : editing
-                  ? 'Salvar alterações'
-                  : 'Cadastrar venda'}
+            <button type="button" className="button button-secondary" onClick={() => setModalOpen(false)}>Cancelar</button>
+            <button type="submit" className="button button-primary" disabled={saving || promotersLoading || (!form.promotor && registeredPromoters.length === 0)}>
+              {saving ? 'Salvando...' : editing ? 'Salvar alterações' : 'Cadastrar venda'}
             </button>
           </div>
         </form>

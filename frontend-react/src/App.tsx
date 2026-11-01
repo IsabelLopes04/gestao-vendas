@@ -18,7 +18,7 @@ import { api } from './services/api';
 import type {
   Meta,
   PageKey,
-  RankingItem,
+  RankingsPromotores,
   Venda,
 } from './types';
 
@@ -31,7 +31,10 @@ export default function App() {
 
   const [sales, setSales] = useState<Venda[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
-  const [ranking, setRanking] = useState<RankingItem[]>([]);
+  const [ranking, setRanking] = useState<RankingsPromotores>({
+    inicio: [],
+    faturamento: [],
+  });
 
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -78,7 +81,7 @@ export default function App() {
     setRefreshKey((current) => current + 1);
   }, []);
 
-  // Carrega vendas, metas e ranking.
+  // Carrega vendas, metas e os dois rankings.
   useEffect(() => {
     let active = true;
 

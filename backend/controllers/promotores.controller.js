@@ -184,33 +184,39 @@ exports.alterarStatusPromotor = async (req, res) => {
 
 // DELETE /api/promotores/:id
 // Desativa o promotor sem apagar seu histórico.
+// DELETE /api/promotores/:id
+// Exclui permanentemente o cadastro do promotor.
+// DELETE /api/promotores/:id
 exports.deletarPromotor = async (req, res) => {
   try {
-    const { id } = req.params;
+    const id = Number(req.params.id);
 
-    if (!idValido(id)) {
-      return res.status(400).json({ erro: 'ID inválido' });
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({
+        erro: 'ID de promotor inválido.'
+      });
     }
 
-    const [existente] = await pool.query(
-      'SELECT id FROM promotores WHERE id = ?',
+    const [result] = await pool.query(
+      'DELETE FROM promotores WHERE id = ?',
       [id]
     );
 
-    if (existente.length === 0) {
-      return res.status(404).json({ erro: 'Promotor não encontrado' });
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        erro: 'Promotor não encontrado.'
+      });
     }
 
-    await pool.query(
-      'UPDATE promotores SET ativo = FALSE WHERE id = ?',
-      [id]
-    );
-
-    res.json({
-      mensagem: 'Promotor desativado com sucesso'
+    return res.json({
+      mensagem: 'Promotor excluído permanentemente. As vendas e metas antigas foram preservadas.'
     });
+
   } catch (err) {
-    console.error('Erro ao desativar promotor:', err);
-    res.status(500).json({ erro: 'Erro ao desativar promotor' });
+    console.error('Erro ao excluir promotor:', err);
+
+    return res.status(500).json({
+      erro: 'Erro ao excluir promotor permanentemente.'
+    });
   }
 };
